@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Admin Panel</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { padding: 2rem; align-items: flex-start; overflow-y: auto;}
+        .admin-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            border-radius: 1rem;
+            display: flex;
+            flex-direction: column;
+            padding: 2rem;
+            min-height: 80vh;
+        }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.7);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .stat-card h4 { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+        .stat-card .value { font-size: 2rem; font-weight: 600; color: var(--primary); }
+        
+        .tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+        .tab-btn {
+            padding: 0.75rem 1.5rem;
+            background: rgba(255,255,255,0.5);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 0.5rem; overflow: hidden; font-size: 0.9rem; }
+        th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #f3f4f6; }
+        th { background: #f9fafb; font-weight: 600; color: var(--text-muted); }
+        tr:hover { background: #f9fafb; }
+        
+        .action-btn { background: none; border: none; cursor: pointer; color: var(--primary); margin-right: 0.5rem; }
+        .action-btn.delete { color: #ef4444; }
+        
+        .export-btn {
+            padding: 0.5rem 1rem; background: #10b981; color: white;
+            border: none; border-radius: 0.5rem; cursor: pointer; margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Admin Login Modal -->
+    <div id="admin-login-modal" class="modal">
+        <div class="modal-content glass">
+            <i class="fa-solid fa-lock" style="font-size: 3rem; color: var(--primary); margin-bottom:1rem;"></i>
+            <h2>Admin Login</h2>
+            <p>Enter your admin credentials.</p>
+            <input type="password" id="admin-pwd" placeholder="Enter password (admin123)" />
+            <button id="admin-login-btn">Login</button>
+            <p id="admin-error" class="error-text" style="display: none;">Invalid credentials.</p>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-dashboard" class="glass admin-container" style="display:none;">
+        <div class="admin-header">
+            <h2><i class="fa-solid fa-chart-pie"></i> Admin Dashboard</h2>
+            <a href="index.html" class="admin-link"><i class="fa-solid fa-arrow-left"></i> Back to Chat</a>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>Total Queries</h4>
+                <div class="value" id="stat-total">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>Resolved Accurately</h4>
+                <div class="value" id="stat-resolved">0</div>
+            </div>
+            <div class="stat-card">
+                <h4>Escalated to Support</h4>
+                <div class="value" id="stat-escalated">0</div>
+            </div>
+        </div>
+
+        <div class="charts-container" style="display: flex; gap: 1.5rem; margin-bottom: 2rem; flex-wrap: wrap;">
+            <div class="stat-card" style="flex: 1; min-width: 300px;">
+                <h4>Queries by Department</h4>
+                <canvas id="deptChart" style="margin-top: 1rem;"></canvas>
+            </div>
+            <div class="stat-card" style="flex: 1; min-width: 300px; display:flex; flex-direction:column; align-items:center;">
+                <h4>Resolution Rate</h4>
+                <canvas id="resolutionChart" style="margin-top: 1rem; max-height: 250px;"></canvas>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('logs', event)">Interaction Logs</button>
+            <button class="tab-btn" onclick="switchTab('faqs', event)">FAQ Management</button>
+            <button class="tab-btn" onclick="switchTab('users', event)">User Management</button>
+            <button class="tab-btn" onclick="switchTab('resources', event)">Resource Management</button>
+            <button class="tab-btn" onclick="switchTab('departments', event)">Support Teams</button>
+            <button class="tab-btn" onclick="switchTab('templates', event)">Templates & Guides</button>
+        </div>
+
+        <div id="logs-tab" class="tab-content active">
+            <button class="export-btn" onclick="exportLogs()"><i class="fa-solid fa-download"></i> Export Logs to CSV</button>
+            <div style="overflow-x: auto;">
+                <table id="logs-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>TMID</th>
+                            <th>Name</th>
+                            <th>Question</th>
+                            <th>Answer</th>
+                            <th>Status</th>
+                            <th>Feedback</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="faqs-tab" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="export-btn" onclick="exportFAQs()" style="margin-bottom:0;"><i class="fa-solid fa-download"></i> Export FAQs</button>
+                    <label class="export-btn" style="background: #eab308; cursor: pointer; margin-bottom:0; display:inline-block;">
+                        <i class="fa-solid fa-upload"></i> Bulk Upload FAQs
+                        <input type="file" id="bulk-upload-faq-csv" accept=".csv" style="display: none;" onchange="handleBulkFAQUpload(event)">
+                    </label>
+                </div>
+                <button class="export-btn" style="background: var(--primary); margin-bottom:0;" onclick="openFAQModal()"><i class="fa-solid fa-plus"></i> Add New FAQ</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="faqs-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Question</th>
+                            <th>Keywords</th>
+                            <th>Department</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="users-tab" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="export-btn" onclick="exportUsers()" style="margin-bottom:0;"><i class="fa-solid fa-download"></i> Export CSV</button>
+                    <label class="export-btn" style="background: #eab308; cursor: pointer; margin-bottom:0; display:inline-block;">
+                        <i class="fa-solid fa-upload"></i> Bulk Upload CSV
+                        <input type="file" id="bulk-upload-csv" accept=".csv" style="display: none;" onchange="handleBulkUpload(event)">
+                    </label>
+                </div>
+                <button class="export-btn" style="background: var(--primary); margin-bottom:0;" onclick="openUserModal()"><i class="fa-solid fa-plus"></i> Add New User</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="users-table">
+                    <thead>
+                        <tr>
+                            <th>TM ID</th>
+                            <th>Name</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="resources-tab" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="export-btn" onclick="exportResources()" style="margin-bottom:0;"><i class="fa-solid fa-download"></i> Export CSV</button>
+                    <label class="export-btn" style="background: #eab308; cursor: pointer; margin-bottom:0; display:inline-block;">
+                        <i class="fa-solid fa-upload"></i> Bulk Upload CSV
+                        <input type="file" id="bulk-upload-resource-csv" accept=".csv" style="display: none;" onchange="handleBulkResourceUpload(event)">
+                    </label>
+                </div>
+                <button class="export-btn" style="background: var(--primary); margin-bottom:0;" onclick="openResourceModal()"><i class="fa-solid fa-plus"></i> Add New Resource</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="resources-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>URL</th>
+                            <th>Department</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div> <!-- End of resources tab -->
+
+        <div id="departments-tab" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem;">
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button class="export-btn" onclick="exportDepartments()" style="margin-bottom:0;"><i class="fa-solid fa-download"></i> Export CSV</button>
+                    <label class="export-btn" style="background: #eab308; cursor: pointer; margin-bottom:0; display:inline-block;">
+                        <i class="fa-solid fa-upload"></i> Bulk Upload CSV
+                        <input type="file" id="bulk-upload-dept-csv" accept=".csv" style="display: none;" onchange="handleBulkDeptUpload(event)">
+                    </label>
+                </div>
+                <button class="export-btn" style="background: var(--primary); margin-bottom:0;" onclick="openDeptModal()"><i class="fa-solid fa-plus"></i> Add Support Agent</button>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="departments-table">
+                    <thead>
+                        <tr>
+                            <th>Department</th>
+                            <th>Agent Name</th>
+                            <th>Email</th>
+                            <th>Shift</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div> <!-- End of departments tab -->
+
+        <div id="templates-tab" class="tab-content">
+            <h3 style="margin-bottom: 1rem; color: #111827;">Bulk Upload Templates</h3>
+            <p style="margin-bottom: 1.5rem; color: var(--text-muted); line-height: 1.6;">
+                Save time by uploading your data in bulk! Download the specific CSV template below. You can open these templates in <strong>Microsoft Excel</strong> or Google Sheets, add your data, and then <strong>Save As CSV</strong>.<br><br>
+                Once your file is ready, go to the respective management tab above and click the <span style="background: #eab308; color: white; padding: 0.2rem 0.5rem; border-radius: 0.25rem;"><i class="fa-solid fa-upload"></i> Bulk Upload CSV</span> button to import your data.
+            </p>
+            <div style="display:flex; flex-direction:column; gap:1rem; max-width:400px; padding: 1.5rem; background: #f9fafb; border-radius: 0.5rem; border: 1px dashed #d1d5db;">
+                <a href="faq_template.csv" download class="export-btn" style="text-align:center; text-decoration:none; display:inline-block; margin-bottom:0; background: var(--primary);"><i class="fa-solid fa-file-csv"></i> Download FAQ Template</a>
+                <a href="users_template.csv" download class="export-btn" style="text-align:center; text-decoration:none; display:inline-block; margin-bottom:0; background: var(--primary);"><i class="fa-solid fa-file-csv"></i> Download Users Template</a>
+                <a href="resources_template.csv" download class="export-btn" style="text-align:center; text-decoration:none; display:inline-block; margin-bottom:0; background: var(--primary);"><i class="fa-solid fa-file-csv"></i> Download Resources Template</a>
+                <a href="departments_template.csv" download class="export-btn" style="text-align:center; text-decoration:none; display:inline-block; margin-bottom:0; background: var(--primary);"><i class="fa-solid fa-file-csv"></i> Download Support Agents Template</a>
+            </div>
+        </div>
+    </div> <!-- End of admin dashboard -->
+
+    <!-- Add/Edit User Modal -->
+    <div id="user-modal" class="modal" style="display:none; z-index: 1050;">
+        <div class="modal-content glass" style="max-width: 400px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <h2 id="user-modal-title" style="margin: 0;">Add User</h2>
+                <button onclick="closeUserModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <input type="hidden" id="user-original-id" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">TM ID</label>
+            <input type="text" id="user-id" placeholder="e.g. TM007" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Name</label>
+            <input type="text" id="user-name" placeholder="e.g. James Bond" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1.5rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            
+            <div style="display: flex; gap: 1rem;">
+                <button onclick="saveUser()" style="flex: 1; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Save User</button>
+                <button onclick="closeUserModal()" style="flex: 1; padding: 0.75rem; background: #9ca3af; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit FAQ Modal -->
+    <div id="faq-modal" class="modal" style="display:none; z-index: 1050;">
+        <div class="modal-content glass" style="max-width: 500px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <h2 id="faq-modal-title" style="margin: 0;">Add FAQ</h2>
+                <button onclick="closeFAQModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <input type="hidden" id="faq-id" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Question</label>
+            <input type="text" id="faq-question" placeholder="e.g. How to reset password?" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Answer</label>
+            <textarea id="faq-answer" rows="4" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; resize: vertical; outline: none;" placeholder="Answer text..."></textarea>
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Keywords (comma separated)</label>
+            <input type="text" id="faq-keywords" placeholder="password, reset, login" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Department</label>
+            <select id="faq-dept" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #d1d5db; margin-bottom: 1.5rem; font-family: inherit; font-size: 0.95rem; outline: none;">
+                <option value="HR">HR</option>
+                <option value="IT">IT Support</option>
+                <option value="Finance">Finance</option>
+            </select>
+            
+            <div style="display: flex; gap: 1rem;">
+                <button onclick="saveFAQ()" style="flex: 1; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Save FAQ</button>
+                <button onclick="closeFAQModal()" style="flex: 1; padding: 0.75rem; background: #9ca3af; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Resource Modal -->
+    <div id="resource-modal" class="modal" style="display:none; z-index: 1050;">
+        <div class="modal-content glass" style="max-width: 500px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <h2 id="resource-modal-title" style="margin: 0;">Add Resource</h2>
+                <button onclick="closeResourceModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <input type="hidden" id="resource-id" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Title</label>
+            <input type="text" id="resource-title" placeholder="e.g. Employee Handbook" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Type</label>
+            <select id="resource-type" onchange="toggleResourceInput()" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #d1d5db; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; outline: none;">
+                <option value="Document">PDF Document</option>
+                <option value="Link">Portal Link</option>
+            </select>
+            
+            <label id="resource-url-label" style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Upload Document</label>
+            <input type="file" id="resource-file" accept=".pdf" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.5rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            <input type="text" id="resource-url" placeholder="https://..." style="display: none; width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            <div id="document-preview" style="font-size: 0.85rem; color: var(--primary); margin-bottom: 1rem; display: none;"><i class="fa-solid fa-file-pdf"></i> Current Document Exists (uploading a new one overwrites it)</div>
+
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Keywords (comma separated)</label>
+            <input type="text" id="resource-keywords" placeholder="policy, handbook, link" style="width: 100%; border-radius: 0.5rem; border: 1px solid #d1d5db; padding: 0.75rem; margin-bottom: 1.5rem; font-family: inherit; font-size: 0.95rem; outline: none;" />
+            
+            <label style="font-weight: 500; font-size: 0.9rem; margin-bottom: 0.25rem; display: block;">Department</label>
+            <select id="resource-dept" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid #d1d5db; margin-bottom: 1.5rem; font-family: inherit; font-size: 0.95rem; outline: none;">
+                <option value="HR">HR</option>
+                <option value="IT">IT Support</option>
+                <option value="Finance">Finance</option>
+            </select>
+            
+            <div style="display: flex; gap: 1rem;">
+                <button onclick="saveResource()" style="flex: 1; padding: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Save</button>
+                <button onclick="closeResourceModal()" style="flex: 1; padding: 0.75rem; background: #9ca3af; color: white; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Department Agent Modal -->
+    <div id="dept-modal" class="modal" style="display:none; z-index: 1050;">
+        <div class="modal-content glass" style="max-width: 450px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                <h2 id="dept-modal-title" style="margin: 0;">Add Support Agent</h2>
+                <button onclick="closeDeptModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-muted);">&times;</button>
+            </div>
+            <p style="margin-bottom: 1rem; color: #4B5563; font-size: 0.9rem;">Assign a support agent to a specific department. Ensure the email is their active MS Teams identifier.</p>
+            <input type="hidden" id="edit-dept-id" value="">
+            
+            <label style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Department <span style="color:red;">*</span></label>
+            <input type="text" id="dept-name-input" placeholder="e.g. HR, IT, Finance" style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #D1D5DB; margin-bottom: 1rem;" autocomplete="off">
+            
+            <label style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Agent Name <span style="color:red;">*</span></label>
+            <input type="text" id="agent-name-input" placeholder="e.g. Alice Smith" style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #D1D5DB; margin-bottom: 1rem;" autocomplete="off">
+            
+            <label style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Agent Email (MS Teams) <span style="color:red;">*</span></label>
+            <input type="email" id="agent-email-input" placeholder="e.g. alice.smith@company.com" style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #D1D5DB; margin-bottom: 1rem;" autocomplete="off">
+            
+            <label style="display: block; font-weight: 500; margin-bottom: 0.25rem;">Shift Details <span style="color:red;">*</span></label>
+            <input type="text" id="agent-shift-input" placeholder="e.g. Morning (9 AM - 5 PM)" style="width: 100%; padding: 0.75rem; border-radius: 6px; border: 1px solid #D1D5DB; margin-bottom: 1.5rem;" autocomplete="off">
+            
+            <p id="dept-error-msg" style="color: #ef4444; font-size: 0.85rem; margin-bottom: 1rem; display: none;">Please fill in all required fields.</p>
+            
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button class="export-btn" style="margin: 0; background: #9CA3AF;" onclick="closeDeptModal()">Cancel</button>
+                <button class="export-btn" style="margin: 0; background: #10B981;" onclick="saveDeptAgent()"><i class="fa-solid fa-save"></i> Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="sharepoint-api.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>

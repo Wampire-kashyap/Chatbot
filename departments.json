@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1698710000000,
+    "department": "HR",
+    "name": "Alice Smith",
+    "email": "alice.smith@company.com",
+    "shift": "Morning (9 AM - 5 PM)"
+  },
+  {
+    "id": 1698710000001,
+    "department": "IT",
+    "name": "Bob Jones",
+    "email": "bob.jones@company.com",
+    "shift": "Evening (5 PM - 1 AM)"
+  },
+  {
+    "id": 1698710000002,
+    "department": "Finance",
+    "name": "Charlie Brown",
+    "email": "charlie.brown@company.com",
+    "shift": "General (10 AM - 6 PM)"
+  }
+]
